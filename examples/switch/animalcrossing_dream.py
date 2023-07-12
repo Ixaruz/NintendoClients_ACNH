@@ -44,12 +44,24 @@ DREAM_ID_TEXT = 'DA-' + '-'.join([f'{DREAM_ID:012d}'[index:index+4]for index in 
 TITLE_ID = 0x01006F8002326000
 TITLE_VERSION = 0x001C0000
 
-ACBAA_ID = 0x0123456789abcdef
-ACBAA_PASSWORD = "..."
 
-#HOST = "g%08x-lp1.s.n.srv.nintendo.net" %GAME_SERVER_ID
-#PORT = 443
+# can be found in the decrypted main.dat or personal.dat
+# of your animal crossing save file.
+## for 2.0.0 save files ##
+# main.dat.dec (addresses for Villager0): 
+# Bytes 0x8CD8F8 - 0x8CD900 contain the user id
+# Bytes 0x8CD900 - 0x8CD940 contain the password in plain text
+# personal.dat.dec:
+# Bytes 0x5C960 - 0x5C968 contain the user id
+# Bytes 0x5C968 - 0x5C9A8 contain the password in plain text
 
+# just like BAAS user_id and password, you can get 
+# these by setting up a mitm on your switch and
+# extract them from the request to /api/v1/auth_token.
+# They are packed in the (application/x-msgpack) format.
+
+ACBAA_ID = 0x0123456789abcdef # 16 hex digits also known as mMtNsaId
+ACBAA_PASSWORD = "..." # 64 hex digits
 
 async def main():
 	keys = switch.load_keys(PATH_KEYS)
@@ -105,7 +117,7 @@ async def main():
 
 	response = await acbaa.authenticate(ACBAA_ID, ACBAA_PASSWORD, id_token)
 
-	Body, meta = await acbaa.download_dream(DREAM_ID)
+	Body, meta = await acbaa.download_dream_by_id(DREAM_ID)
 
 
 	if not (os.path.isdir(DREAM_ID_TEXT)): os.mkdir(DREAM_ID_TEXT)
@@ -114,7 +126,7 @@ async def main():
 	f.write(Body)
 	f.close()
 
-	f = open(DREAM_ID_TEXT + "/dreammeta.json", "w")
+	f = open(DREAM_ID_TEXT + "/dreammeta.txt", "w")
 	f.write(str(meta))
 	f.close()
 	

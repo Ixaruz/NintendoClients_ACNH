@@ -117,17 +117,19 @@ class ACBAAClient:
 		# then sends feedback and waits for user input
 		# to confirm and search again to download the metadata and dream properly
 		searchresult = await self.search_dream_by_id(dream_id)
+		
+		#if not one dream is found
+		if(searchresult["count"] != 1):
+			logger.error("Search for dream address ended with no dream found")
+			return 0, 0
+		
 		http.HTTPRequest.get(searchresult["dreams"][0]["meta"])
 		req = await self.send_feedback_id_search(dream_id)
 		sleep(uniform(5.0, 12.0))
 		searchresult = await self.search_dream_by_id(dream_id)
 		
-		#if not one dream is found
-		if(searchresult["count"] != 1):
-			logger.warning("Search for dream address ended with an unexpected response")
-			return 0, 0
 		
-		logger.info(json.dumps(searchresult, indent=2))
+		logger.debug(json.dumps(searchresult, indent=2))
 
 		req1 = http.HTTPRequest.get(searchresult["dreams"][0]["meta"])
 		meta = await self.request(req1, None, MODULE_ENS)

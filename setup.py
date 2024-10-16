@@ -21,6 +21,7 @@ setuptools.setup(
 	},
 	install_requires = [
 		"anynet ~= 1.1",
-		"pycryptodome"
+		"pycryptodome",
+        "ormsgpack"
 	]
 )

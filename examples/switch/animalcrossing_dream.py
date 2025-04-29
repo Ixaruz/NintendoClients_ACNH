@@ -1,13 +1,14 @@
 from nintendo.switch import dauth, aauth, baas, dragons, acbaa
 from nintendo import switch
 import anyio
+import json
 import os
 
 import logging
 logging.basicConfig(level=logging.INFO)
 
 
-SYSTEM_VERSION = 1801 #18.0.1
+SYSTEM_VERSION = 1901 #19.0.1
 
 # You can get your user id and password from
 # su/baas/<guid>.dat in save folder 8000000000000010.
@@ -21,16 +22,23 @@ SYSTEM_VERSION = 1801 #18.0.1
 
 BAAS_USER_ID = 0x0123456789abcdef # 16 hex digits
 BAAS_PASSWORD = "..." # Should be 40 characters
+NA_COUNTRY = "JP" # Country of your Nintendo account
 
 # You can dump prod.keys with Lockpick_RCM and
 # PRODINFO from hekate (decrypt it if necessary)
 PATH_KEYS = "/path/to/prod.keys"
 PATH_PRODINFO = "/path/to/PRODINFO"
 
-# These can be obtained by calling publish_device_linked_elicenses (see docs)
-# or with a mitm on your Switch (this is probably safer)
+# License information is stored encrypted in saved/<license owner id>
+# in save folder 80000000000000E4.
+
+# Alternatively, they can be obtained from the dragons server
+# by calling publish_device_linked_elicenses (see docs), or with
+# a mitm on your Switch.
 ELICENSE_ID = "..." # 32 hex digits
 NA_ID = 0x0123456789abcdef # 16 hex digits
+
+PENNE_ID = "..."
 
 TITLE_ID = 0x01006F8002326000
 TITLE_VERSION = 0x001C0000
@@ -96,12 +104,12 @@ async def main():
 	app_token = response["application_auth_token"]
 	
 	# Request an anonymous access token for baas
-	response = await baas_client.authenticate(device_token_baas)
+	response = await baas_client.authenticate(device_token_baas, PENNE_ID)
 	access_token = response["accessToken"]
 	
 	# Log in on the baas server
 	response = await baas_client.login(
-		BAAS_USER_ID, BAAS_PASSWORD, access_token, app_token
+		BAAS_USER_ID, BAAS_PASSWORD, access_token, app_token, NA_COUNTRY
 	)
 	user_id = int(response["user"]["id"], 16)
 	id_token = response["idToken"]
@@ -120,12 +128,12 @@ async def main():
 
 	if not (os.path.isdir(DREAM_ADDRESS)): os.mkdir(DREAM_ADDRESS)
 
-	f = open(DREAM_ADDRESS + "/dreamdownload.dat", "wb")
+	f = open(DREAM_ADDRESS + "/dream_land.dat", "wb")
 	f.write(Body)
 	f.close()
 
-	f = open(DREAM_ADDRESS + "/dreammeta.txt", "w")
-	f.write(str(meta))
+	f = open(DREAM_ADDRESS + "/dream_land_meta.json", "w")
+	json.dump(meta, f)
 	f.close()
 	
 

@@ -89,64 +89,87 @@ class ACBAAClient:
 		self.auth_token = ormsgpack.unpackb(response.body)["token"]
 		return response.body
 	
-	async def search_dream_by_id(self, dream_id):
-		if self.auth_token == "":
-			return
-		
-		url = "/api/v1/dream_lands"
-		
-		string_query = {
+	async def search_dreams_by_id(self, dream_id):
+		query = {
 			"offset" : 0,
 			"limit" : 150,
 			"q[id]" : dream_id
 		}
 
+		return await self.search_dreams_query_(query)
+
+	async def search_dreams_by_name(self, name):
+		query = {
+			"offset" : 0,
+			"limit" : 150,
+			"q[search_type]" : "name",
+			"q[land_name]" : name
+		}
+
+		return await self.search_dreams_query_(query)
+
+	async def search_dreams_by_recommend(self, lang="ja"):
+		query = {
+			"offset" : 0,
+			"limit" : 150,
+			"q[search_type]" : "recommend",
+			"q[lang]" : lang
+		}
+
+		return await self.search_dreams_query_(query)
+
+	async def search_dreams_query_(self, query):
+		if self.auth_token == "":
+			return
+		
+		url = "/api/v1/dream_lands"
+
 		url_parts = urllib.parse.urlparse(url)
-		query = dict(urllib.parse.parse_qsl(url_parts.query))
-		query.update(string_query)
-		new_url = url_parts._replace(query=urllib.parse.urlencode(query)).geturl()
+		query_dict = dict(urllib.parse.parse_qsl(url_parts.query))
+		query_dict.update(query)
+		new_url = url_parts._replace(query=urllib.parse.urlencode(query_dict)).geturl()
 
 		req = http.HTTPRequest.get(new_url)
 
 		response = await self.request(req, self.auth_token, MODULE_ENS)
-		searchresult = ormsgpack.unpackb(response.body)
-		return searchresult
-	
+		search_result = ormsgpack.unpackb(response.body)
+		return search_result
+
 	async def download_dream_by_id(self, dream_id):
 		# mimic the game's behavior; it searches and gets metadata, 
 		# then sends feedback and waits for user input
 		# to confirm and search again to download the metadata and dream properly
-		searchresult = await self.search_dream_by_id(dream_id)
-		
+		search_result = await self.search_dreams_by_id(dream_id)
+
 		#if not one dream is found
-		if(searchresult["count"] != 1):
-			logger.error("Search for dream address ended with no dream found")
-			return 0, 0
-		
-		http.HTTPRequest.get(searchresult["dreams"][0]["meta"])
-		req = await self.send_feedback_id_search(dream_id)
-		sleep(uniform(5.0, 12.0))
-		searchresult = await self.search_dream_by_id(dream_id)
-		
-		
-		logger.debug(json.dumps(searchresult, indent=2))
-
-		req1 = http.HTTPRequest.get(searchresult["dreams"][0]["meta"])
+		if(search_result["count"] != 1):
+			logger.error("Search for dream address ended with %d dream(s) found, when %d was expected" %(search_result["count"], 1))
+			return
+	
+		req1 = http.HTTPRequest.get(search_result["dreams"][0]["meta"])
 		meta = await self.request(req1, None, MODULE_ENS)
-		req2 = http.HTTPRequest.get(searchresult["dreams"][0]["contents"][0]["url"])
-		BodyData = await self.request(req2, None, MODULE_ENS)
+		await self.send_feedback_(dream_id, "id_search")
+		sleep(uniform(3.0, 8.0))
+		search_result = await self.search_dreams_by_id(dream_id)
+		
+		logger.debug(json.dumps(search_result, indent=2))
 
-		return BodyData.body, ormsgpack.unpackb(meta.body)
+		req1 = http.HTTPRequest.get(search_result["dreams"][0]["meta"])
+		meta = await self.request(req1, None, MODULE_ENS)
+		req2 = http.HTTPRequest.get(search_result["dreams"][0]["contents"][0]["url"])
+		body_data = await self.request(req2, None, MODULE_ENS)
+
+		return body_data.body, ormsgpack.unpackb(meta.body)
 
 	# idk how necessary this function is, though it's best to send feedback after searching for a dream
-	async def send_feedback_id_search(self, dream_id):
+	async def send_feedback_(self, dream_id, kind):
 		if self.auth_token == "":
 			return
 		
 		req = http.HTTPRequest.post("/api/v1/dream_lands/%s/feedback" %dream_id)
 		
 		data = {
-			"kind" : "id_search"
+			"kind" : kind
 		}
 
 		req.body = ormsgpack.packb(data)
@@ -161,4 +184,3 @@ class ACBAAClient:
 		response = await self.request(req, self.auth_token, MODULE_ENS)
 		friends = ormsgpack.unpackb(response.body)
 		return friends
-        
